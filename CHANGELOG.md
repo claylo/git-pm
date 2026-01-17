@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.0.2](https://github.com/claylo/git-pm/compare/8e3b52e36c91082123a5fcc52fe20dae8da2f436..v1.0.2) - 2026-01-17
+#### Bug Fixes
+- improve check polling reliability (#8) - ([ad1851a](https://github.com/claylo/git-pm/commit/ad1851a1528d42223b5ef28f2aa39d22d8e46d55)) - Clay Loveless
+
+- - -
+
 ## [v1.0.1](https://github.com/claylo/git-pm/compare/f6e110d80bfd1d2c608dfe2d9ba1c66b58ccbd6d..v1.0.1) - 2026-01-17
 #### Bug Fixes
 - correct flag handling and add version/help options (#4) - ([bd25d34](https://github.com/claylo/git-pm/commit/bd25d34af46a76a928900fe365206c1d6f52e366)) - Clay Loveless
