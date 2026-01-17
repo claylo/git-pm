@@ -1,0 +1,29 @@
+# .github/workflows/brew-release.yml
+# Start Homebrew Releaser when a new GitHub release is created
+name: Homebrew Release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  homebrew-releaser:
+    runs-on: ubuntu-latest
+    name: homebrew-releaser
+    steps:
+      - name: Release project to Homebrew tap
+        uses: Justintime50/homebrew-releaser@v3
+        with:
+          # The name of the homebrew tap to publish your formula to as it appears on GitHub (Homebrew taps must start with `homebrew-`).
+          # Required - strings
+          homebrew_owner: claylo
+          homebrew_tap: homebrew-brew
+
+          # The Personal Access Token (saved as a repo secret) that has `repo` permissions for the repo running the action AND Homebrew tap you want to release to.
+          # Required - string
+          github_token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+          # Install command for your formula.
+          # Required - string
+          install: 'bin.install "git-pm" => "git-pm"'
