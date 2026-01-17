@@ -102,6 +102,8 @@ else
     SKIP_MERGE=false
     # Split flags into array (temporarily restore default IFS for word splitting)
     IFS=' ' read -ra MERGE_FLAGS <<< "$MERGE_FLAGS_STR"
+    # Keep string version for display (IFS would join with newline)
+    MERGE_FLAGS_DISPLAY="$MERGE_FLAGS_STR"
 fi
 
 MAX_WAIT=${GIT_PM_MAX_WAIT:-300}
@@ -203,11 +205,11 @@ else
     if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
         echo "⏱️  Timeout waiting for checks. You can merge manually:"
         echo
-        echo "gh pr merge ${MERGE_FLAGS[*]}"
+        echo "gh pr merge $MERGE_FLAGS_DISPLAY"
         exit 1
     fi
 
-    echo "🚀 Merging PR with: gh pr merge ${MERGE_FLAGS[*]}"
+    echo "🚀 Merging PR with: gh pr merge $MERGE_FLAGS_DISPLAY"
     gh pr merge "${MERGE_FLAGS[@]}"
     echo "✓ Done!"
 fi
