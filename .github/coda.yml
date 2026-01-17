@@ -20,5 +20,5 @@ dependabot_alerts: true
 dependabot_security_updates: true
 
 # 1Password secrets sync (optional)
-# secrets_tags: github-actions
-# secrets_app: actions
+secrets_tags: claylo-github-actions
+secrets_app: actions
