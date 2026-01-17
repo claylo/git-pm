@@ -71,7 +71,8 @@ fi
 PR_TITLE="$FIRST_LINE"
 
 # Get everything after the first line as the body (if it exists)
-PR_BODY=$(echo "$COMMIT_MSG" | tail -n +2 | sed '/^$/d' | head -c -1)
+PR_BODY=$(echo "$COMMIT_MSG" | tail -n +2 | sed '/^$/d')
+PR_BODY="${PR_BODY%$'\n'}"
 
 # Push first
 git push
