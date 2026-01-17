@@ -24,6 +24,64 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+version() {
+  echo "git-pm (development)"
+}
+
+usage() {
+  cat <<'EOF'
+git-pm - Git Push & Merge
+
+A smart wrapper for the GitHub CLI that validates conventional commits,
+creates PRs, waits for checks, and auto-merges.
+
+USAGE:
+    git pm [OPTIONS]
+
+OPTIONS:
+    -h, --help       Show this help message
+    -V, --version    Show version information
+
+ENVIRONMENT VARIABLES:
+    GIT_PM_BASE      Target branch for PR (default: main)
+    GIT_PM_MERGE     Flags for 'gh pr merge' (default: --auto --squash)
+                     Set to 'false' to skip auto-merge
+    GIT_PM_MAX_WAIT  Max seconds to wait for checks (default: 300)
+    GIT_PM_INTERVAL  Check polling interval in seconds (default: 5)
+
+EXAMPLES:
+    git pm                              # Push, create PR, wait, merge
+    GIT_PM_MERGE=false git pm           # Create PR without auto-merge
+    GIT_PM_BASE=develop git pm          # Target 'develop' branch
+    GIT_PM_MERGE="--auto --rebase" git pm  # Use rebase strategy
+
+COMMIT FORMAT:
+    Commits must follow Conventional Commits specification:
+    <type>[optional scope]: <description>
+
+    Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+
+For more information: https://github.com/claylo/git-pm
+EOF
+}
+
+# Handle arguments
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  -V|--version)
+    version
+    exit 0
+    ;;
+  -*)
+    echo "Unknown option: $1" >&2
+    echo "Run 'git pm --help' for usage information." >&2
+    exit 1
+    ;;
+esac
+
 config() {
   echo "The following variables are optional:"
   echo
@@ -42,8 +100,8 @@ if [[ "$MERGE_FLAGS_STR" == "false" ]]; then
     MERGE_FLAGS=()
 else
     SKIP_MERGE=false
-    # Split flags into array
-    read -ra MERGE_FLAGS <<< "$MERGE_FLAGS_STR"
+    # Split flags into array (temporarily restore default IFS for word splitting)
+    IFS=' ' read -ra MERGE_FLAGS <<< "$MERGE_FLAGS_STR"
 fi
 
 MAX_WAIT=${GIT_PM_MAX_WAIT:-300}
