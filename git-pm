@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+#
+# git-pm
+#
+# Git Push & Merge
+#
+# A quickie wrapper for pushing to GitHub, creating a PR off of your commit messages,
+# and (optionally) merging it right away (or after your checks complete successfully,
+# if you have them.).
+#
+# This script recognizes some environment variables, so that you don't have to set
+# the flags on each run. For example, if I'm doing a lot of work that still qualifies
+# as alpha release, I'm going to set an environment variable called GIT_PM_BASE
+# and give it the branch name. That will be passed to the gh pr create --base <branch>
+# option, where <branch> will be replaced with the GIT_PM_BASE value.
+#
+# You can also customize the merge behavior with GIT_PM_MERGE. Set it to the flags
+# you want passed to 'gh pr merge' (default: --auto --squash), or set it to 'false'
+# to skip auto-merging entirely.
+#
+# Copyright (c) 2026 Clay Loveless
+# SPDX-License-Identifier: MIT
+#
+set -euo pipefail
+IFS=$'\n\t'
+
+config() {
+  echo "The following variables are optional:"
+  echo
+  echo "  GIT_PM_BASE:   the branch you want this pull request merge into (default: main)"
+  echo "  GIT_PM_MERGE:  flags to pass to 'gh pr merge' (default: --auto --squash)"
+  echo "                 set to 'false' to skip auto-merge"
+  echo
+}
+
+MERGE_INTO=${GIT_PM_BASE:-main}
+
+MERGE_FLAGS=${GIT_PM_MERGE:---auto --squash}
+
+MAX_WAIT=${GIT_PM_MAX_WAIT:-300}
+
+POLL_INTERVAL=${GIT_PM_INTERVAL:-5}
+
+# Get the full commit message
+COMMIT_MSG=$(git log -1 --pretty=%B)
+
+# Extract first line (title)
+FIRST_LINE=$(echo "$COMMIT_MSG" | head -n1)
+
+# Conventional commits pattern: type(optional-scope): description
+# Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+CONVENTIONAL_PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?: .+'
+
+if ! echo "$FIRST_LINE" | grep -qE "$CONVENTIONAL_PATTERN"; then
+    echo "❌ Error: Commit message does not follow conventional commits format"
+    echo
+    echo "First line: $FIRST_LINE"
+    echo
+    echo "Expected format: <type>[optional scope]: <description>"
+    echo "Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+    echo
+    echo "Examples:"
+    echo "  feat: add new feature"
+    echo "  fix(api): resolve null pointer exception"
+    echo "  docs: update README with installation steps"
+    echo
+    exit 1
+fi
+
+# Use the first line as the PR title
+PR_TITLE="$FIRST_LINE"
+
+# Get everything after the first line as the body (if it exists)
+PR_BODY=$(echo "$COMMIT_MSG" | tail -n +2 | sed '/^$/d' | head -c -1)
+
+# Push first
+git push
+
+# Create PR with explicit title and body and capture the URL
+if [[ -n "$PR_BODY" ]]; then
+    PR_URL=$(gh pr create --title "$PR_TITLE" --body "$PR_BODY" --base "${MERGE_INTO}")
+else
+    PR_URL=$(gh pr create --title "$PR_TITLE" --body "" --base "${MERGE_INTO}")
+fi
+
+echo "✓ PR created: $PR_URL"
+
+if [[ "$MERGE_FLAGS" == "false" ]]; then
+    echo
+    echo "not auto merging. when pr is clean, you can run:"
+    echo ""
+    echo "gh pr merge --auto --squash"
+else
+    echo "⏳ Waiting for PR checks to complete..."
+
+    # Poll for check status
+    ELAPSED=0
+
+    while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
+        # Get check status as JSON
+        CHECK_STATUS=$(gh pr view --json statusCheckRollup --jq '.statusCheckRollup[]' 2>/dev/null || echo "")
+
+        if [[ -z "$CHECK_STATUS" ]]; then
+            # No checks configured, safe to merge immediately
+            echo "✓ No checks configured, proceeding with merge"
+            break
+        fi
+
+        # Count check states
+        PENDING=$(gh pr view --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.status == "PENDING" or .status == "IN_PROGRESS")] | length' 2>/dev/null || echo "0")
+        FAILED=$(gh pr view --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE")] | length' 2>/dev/null || echo "0")
+        SUCCESS=$(gh pr view --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "SUCCESS")] | length' 2>/dev/null || echo "0")
+        TOTAL=$(gh pr view --json statusCheckRollup --jq '.statusCheckRollup | length' 2>/dev/null || echo "0")
+
+        if [[ "$FAILED" -gt 0 ]]; then
+            echo "❌ Check(s) failed. Aborting auto-merge."
+            echo
+            echo "View details: $PR_URL"
+            echo
+            gh pr checks
+            exit 1
+        fi
+
+        if [[ "$PENDING" -eq 0 ]] && [[ "$SUCCESS" -eq "$TOTAL" ]] && [[ "$TOTAL" -gt 0 ]]; then
+            echo "✓ All checks passed ($SUCCESS/$TOTAL)"
+            break
+        fi
+
+        echo "  ⋯ Checks: $SUCCESS passed, $PENDING pending ($ELAPSED/${MAX_WAIT}s)"
+        sleep "$POLL_INTERVAL"
+        ELAPSED=$((ELAPSED + POLL_INTERVAL))
+    done
+
+    if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
+        echo "⏱️  Timeout waiting for checks. You can merge manually:"
+        echo
+        echo "gh pr merge $MERGE_FLAGS"
+        exit 1
+    fi
+
+    echo "🚀 Merging PR with: gh pr merge $MERGE_FLAGS"
+    gh pr merge "$MERGE_FLAGS"
+    echo "✓ Done!"
+fi
