@@ -35,7 +35,16 @@ config() {
 
 MERGE_INTO=${GIT_PM_BASE:-main}
 
-MERGE_FLAGS=${GIT_PM_MERGE:---auto --squash}
+# Handle merge flags - convert to array for proper word splitting
+MERGE_FLAGS_STR=${GIT_PM_MERGE:---auto --squash}
+if [[ "$MERGE_FLAGS_STR" == "false" ]]; then
+    SKIP_MERGE=true
+    MERGE_FLAGS=()
+else
+    SKIP_MERGE=false
+    # Split flags into array
+    read -ra MERGE_FLAGS <<< "$MERGE_FLAGS_STR"
+fi
 
 MAX_WAIT=${GIT_PM_MAX_WAIT:-300}
 
@@ -72,6 +81,7 @@ PR_TITLE="$FIRST_LINE"
 
 # Get everything after the first line as the body (if it exists)
 PR_BODY=$(echo "$COMMIT_MSG" | tail -n +2 | sed '/^$/d')
+# Remove trailing newline if present
 PR_BODY="${PR_BODY%$'\n'}"
 
 # Push first
@@ -86,7 +96,7 @@ fi
 
 echo "✓ PR created: $PR_URL"
 
-if [[ "$MERGE_FLAGS" == "false" ]]; then
+if [[ "$SKIP_MERGE" == "true" ]]; then
     echo
     echo "not auto merging. when pr is clean, you can run:"
     echo ""
@@ -135,11 +145,11 @@ else
     if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
         echo "⏱️  Timeout waiting for checks. You can merge manually:"
         echo
-        echo "gh pr merge $MERGE_FLAGS"
+        echo "gh pr merge ${MERGE_FLAGS[*]}"
         exit 1
     fi
 
-    echo "🚀 Merging PR with: gh pr merge $MERGE_FLAGS"
-    gh pr merge "$MERGE_FLAGS"
+    echo "🚀 Merging PR with: gh pr merge ${MERGE_FLAGS[*]}"
+    gh pr merge "${MERGE_FLAGS[@]}"
     echo "✓ Done!"
 fi
