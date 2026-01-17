@@ -27,7 +27,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_TOKEN }}
       - name: GitHub Actions Bot Setup
         uses: ./.github/actions/bot-setup
 
