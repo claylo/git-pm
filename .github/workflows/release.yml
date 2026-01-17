@@ -33,22 +33,7 @@ jobs:
       - name: Generate release notes
         run: |
           cog changelog --at "$GITHUB_REF_NAME" > RELEASE_NOTES.md
-          cat >> RELEASE_NOTES.md << 'EOF'
-
-          ## Installation
-
-          ```bash
-          brew install claylo/brew/git-pm
-          ```
-
-          Or download the `git-pm` script and place it in your PATH.
-
-          ## Already Installed? Upgrade
-
-          ```bash
-          brew upgrade git-pm
-          ```
-          EOF
+          cat .github/RELEASE_NOTES_TRAILER.md >> RELEASE_NOTES.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
