@@ -164,18 +164,35 @@ if [[ "$SKIP_MERGE" == "true" ]]; then
 else
     echo "⏳ Waiting for PR checks to complete..."
 
+    # Give CI a moment to register checks
+    sleep 3
+
     # Poll for check status
     ELAPSED=0
+    CHECKS_SEEN=false
 
     while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
         # Get check status as JSON
         CHECK_STATUS=$(gh pr view --json statusCheckRollup --jq '.statusCheckRollup[]' 2>/dev/null || echo "")
 
         if [[ -z "$CHECK_STATUS" ]]; then
-            # No checks configured, safe to merge immediately
-            echo "✓ No checks configured, proceeding with merge"
-            break
+            if [[ "$CHECKS_SEEN" == "true" ]]; then
+                # Checks disappeared (shouldn't happen), treat as done
+                echo "✓ No checks remaining, proceeding with merge"
+                break
+            elif [[ "$ELAPSED" -ge 10 ]]; then
+                # Waited 10s and still no checks - likely none configured
+                echo "✓ No checks configured, proceeding with merge"
+                break
+            fi
+            # Still waiting for checks to register
+            echo "  ⋯ Waiting for checks to register ($ELAPSED/${MAX_WAIT}s)"
+            sleep "$POLL_INTERVAL"
+            ELAPSED=$((ELAPSED + POLL_INTERVAL))
+            continue
         fi
+
+        CHECKS_SEEN=true
 
         # Count check states
         PENDING=$(gh pr view --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.status == "PENDING" or .status == "IN_PROGRESS")] | length' 2>/dev/null || echo "0")
@@ -192,8 +209,8 @@ else
             exit 1
         fi
 
-        if [[ "$PENDING" -eq 0 ]] && [[ "$SUCCESS" -eq "$TOTAL" ]] && [[ "$TOTAL" -gt 0 ]]; then
-            echo "✓ All checks passed ($SUCCESS/$TOTAL)"
+        if [[ "$PENDING" -eq 0 ]] && [[ "$FAILED" -eq 0 ]] && [[ "$TOTAL" -gt 0 ]]; then
+            echo "✓ All checks passed ($SUCCESS passed, $((TOTAL - SUCCESS)) skipped)"
             break
         fi
 
