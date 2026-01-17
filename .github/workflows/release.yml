@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  discussions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: GitHub Actions Bot Setup
+        uses: ./.github/actions/bot-setup
+
+      - name: Bootstrap tools
+        uses: ./.github/actions/bootstrap-tools
+
+      - name: Build
+        run: just build
+
+      - name: Verify build
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "Building release v$VERSION"
+          ./git-pm --version
+
+      - name: Generate release notes
+        run: |
+          cog changelog --at "$GITHUB_REF_NAME" > RELEASE_NOTES.md
+          cat >> RELEASE_NOTES.md << 'EOF'
+
+          ## Installation
+
+          ```bash
+          brew install claylo/brew/git-pm
+          ```
+
+          Or download the `git-pm` script and place it in your PATH.
+
+          ## Already Installed? Upgrade
+
+          ```bash
+          brew upgrade git-pm
+          ```
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          files: git-pm
+          body_path: RELEASE_NOTES.md
+          discussion_category_name: announcements
