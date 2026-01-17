@@ -22,3 +22,27 @@ dependabot_security_updates: true
 # 1Password secrets sync (optional)
 secrets_tags: claylo-github-actions
 secrets_app: actions
+
+rulesets:
+  - name: Protect main branch
+    target: branch                    # branch or tag
+    enforcement: active               # active, evaluate, or disabled
+    conditions:
+      ref_name:
+        include:
+          - "~DEFAULT_BRANCH"         # or: refs/heads/main, refs/heads/release/*
+        exclude: []
+    rules:
+      - type: pull_request
+        parameters:
+          required_approving_review_count: 0
+          dismiss_stale_reviews_on_push: true
+          require_code_owner_review: false
+      - type: required_status_checks
+        parameters:
+          strict_required_status_checks_policy: true
+          required_status_checks:
+            - context: ci/check
+      - type: non_fast_forward        # Prevent force pushes
+      - type: deletion                # Prevent branch deletion
+      - type: required_linear_history
